@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # =========================================================
@@ -10,7 +10,10 @@ from pydantic import BaseModel, ConfigDict, Field
 # =========================================================
 
 class InvoiceItemCreate(BaseModel):
-    product_id: Optional[int] = None
+    product_id: Optional[int] = Field(
+        default=None,
+        gt=0
+    )
 
     description: str = Field(
         ...,
@@ -39,6 +42,16 @@ class InvoiceItemCreate(BaseModel):
         ge=0
     )
 
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, value: str) -> str:
+        value = value.strip()
+
+        if not value:
+            raise ValueError("Description cannot be empty")
+
+        return value
+
 
 class InvoiceItemResponse(BaseModel):
     model_config = ConfigDict(
@@ -61,7 +74,10 @@ class InvoiceItemResponse(BaseModel):
 # =========================================================
 
 class InvoiceCreate(BaseModel):
-    customer_id: int
+    customer_id: int = Field(
+        ...,
+        gt=0
+    )
 
     items: list[InvoiceItemCreate] = Field(
         ...,
@@ -75,7 +91,21 @@ class InvoiceCreate(BaseModel):
         ge=0
     )
 
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(
+        default=None,
+        max_length=1000
+    )
+
+    @field_validator("notes")
+    @classmethod
+    def validate_notes(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            value = value.strip()
+
+            if not value:
+                return None
+
+        return value
 
 
 class InvoiceUpdate(BaseModel):
@@ -86,9 +116,44 @@ class InvoiceUpdate(BaseModel):
         ge=0
     )
 
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(
+        default=None,
+        max_length=1000
+    )
 
     status: Optional[str] = None
+
+    @field_validator("notes")
+    @classmethod
+    def validate_notes(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            value = value.strip()
+
+            if not value:
+                return None
+
+        return value
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            value = value.strip().upper()
+
+            allowed_statuses = {
+                "DRAFT",
+                "ISSUED",
+                "PAID",
+                "CANCELLED"
+            }
+
+            if value not in allowed_statuses:
+                raise ValueError(
+                    "Status must be one of: "
+                    "DRAFT, ISSUED, PAID, CANCELLED"
+                )
+
+        return value
 
 
 class InvoiceResponse(BaseModel):
@@ -121,14 +186,31 @@ class InvoiceResponse(BaseModel):
 # =========================================================
 
 class PaymentCreate(BaseModel):
-    invoice_id: int
+    invoice_id: int = Field(
+        ...,
+        gt=0
+    )
 
     amount: Decimal = Field(
         ...,
         gt=0
     )
 
-    payment_method: str
+    payment_method: str = Field(
+        ...,
+        min_length=1,
+        max_length=50
+    )
+
+    @field_validator("payment_method")
+    @classmethod
+    def validate_payment_method(cls, value: str) -> str:
+        value = value.strip()
+
+        if not value:
+            raise ValueError("Payment method cannot be empty")
+
+        return value
 
 
 class PaymentResponse(BaseModel):
